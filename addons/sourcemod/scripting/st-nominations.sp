@@ -269,8 +269,6 @@ public Action Command_Nominate(int client, int args)
 	{
 		return Plugin_Handled;
 	}
-	
-	CPrintToChatAll("NUMBER OF MAPS: %d\n", g_MapList.Length);
 
 	if (args == 0)
 	{
