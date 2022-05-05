@@ -270,6 +270,8 @@ public Action Command_Nominate(int client, int args)
 		return Plugin_Handled;
 	}
 	
+	CPrintToChatAll("NUMBER OF MAPS: %d\n", g_MapList.Length);
+
 	if (args == 0)
 	{
 		if (GetConVarBool(g_Cvar_Tiered_Menu)) 
@@ -550,7 +552,7 @@ void BuildMapMenu()
 				status = MAPSTATUS_DISABLED|MAPSTATUS_EXCLUDE_PREVIOUS;
 			}
 		}
-		
+
 		g_MapMenu.AddItem(map, displayName);
 		g_mapTrie.SetValue(map, status);
 	}
@@ -639,19 +641,19 @@ public int Handler_MapSelectMenu(Menu menu, MenuAction action, int param1, int p
 			{
 				if ((status & MAPSTATUS_EXCLUDE_CURRENT) == MAPSTATUS_EXCLUDE_CURRENT)
 				{
-					Format(display, sizeof(display), "%s %T", displayName, "Current Map", param1);
+					Format(display, sizeof(display), "%s%T", displayName, "Current Map", param1);
 					return RedrawMenuItem(display);
 				}
 				
 				if ((status & MAPSTATUS_EXCLUDE_PREVIOUS) == MAPSTATUS_EXCLUDE_PREVIOUS)
 				{
-					Format(display, sizeof(display), "%s %T", displayName, "Recently Played", param1);
+					Format(display, sizeof(display), "%s%T", displayName, "Recently Played", param1);
 					return RedrawMenuItem(display);
 				}
 				
 				if ((status & MAPSTATUS_EXCLUDE_NOMINATED) == MAPSTATUS_EXCLUDE_NOMINATED)
 				{
-					Format(display, sizeof(display), "%s %T", displayName, "Nominated", param1);
+					Format(display, sizeof(display), "%s%T", displayName, "Nominated", param1);
 					return RedrawMenuItem(display);
 				}
 			}
@@ -815,7 +817,7 @@ void BuildTierMenus()
 	g_TieredMenu = new Menu(TiersMenuHandler);
 	g_TieredMenu.ExitButton = true;
 	
-	g_TieredMenu.SetTitle("Nominate Menu");	
+	g_TieredMenu.SetTitle("Nominate Menu"); 
 	g_TieredMenu.AddItem("Alphabetic", "Alphabetic");
 	g_TieredMenu.AddItem("Incomplete", "Incomplete Maps\n ");
 

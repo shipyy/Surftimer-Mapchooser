@@ -99,7 +99,7 @@ public void OnPluginStart()
 	g_Cvar_VIPOverwriteRequirements = AutoExecConfig_CreateConVar("sm_rtv_vipoverwrite", "0", "1 - VIP's bypass Rank and/or Points requirement, 0 - VIP's need to meet the Rank and/or Points requirement", _, true, 0.0, true, 1.0);
 	g_PlayerOne = AutoExecConfig_CreateConVar("sm_rtv_oneplayer", "1", "If there is  only one player in the server allow him to rtv 1-allow 0-no", _, true, 0.0, true, 1.0);
 
-	RegConsoleCmd("sm_rtv", Command_RTV);
+	RegConsoleCmd("sm_rtv", Command_RTV, "SurfTimer | Vote to extend the map");
 	
 	AutoExecConfig_ExecuteFile();
 	AutoExecConfig_CleanFile();
@@ -209,15 +209,10 @@ public void OnClientDisconnect(int client)
 	g_Voters--;
 	CalcVotesNeeded();
 	
-	if (g_Votes && 
-		g_Voters && 
-		g_Votes >= g_VotesNeeded && 
-		g_RTVAllowed ) 
+	if (g_Votes && g_Voters && g_Votes >= g_VotesNeeded && g_RTVAllowed ) 
 	{
 		if (g_Cvar_RTVPostVoteAction.IntValue == 1 && HasEndOfMapVoteFinished())
-		{
 			return;
-		}
 		
 		StartRTV();
 	}	

@@ -742,7 +742,7 @@ void InitiateVote(MapChange when, ArrayList inputlist=null)
 	}
 	
 	/* Do we add any special items? */
-	if ((when == MapChange_Instant || when == MapChange_RoundEnd) && g_Cvar_DontChange.BoolValue)
+	if ((when == MapChange_Instant || when == MapChange_RoundEnd || when == MapChange_MapEnd) && g_Cvar_DontChange.BoolValue)
 	{
 		g_VoteMenu.AddItem(VOTE_DONTCHANGE, "Don't Change");
 	}

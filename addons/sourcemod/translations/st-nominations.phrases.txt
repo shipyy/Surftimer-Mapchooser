@@ -72,8 +72,8 @@
 
 	"Final Map Info"
 	{
-		"#format"		"{1:s},{2:s},{3:s},{4:s}" // 1-map 2-tier 3-stage 4-bonus
-		"en"			"{1} | {2} {3} {4}"
+		"#format"		"{1:s},{2:s},{3:s},{4:s}"
+		"en"			"{1} \n ({2} {3} {4})\n "
 	}
 
 	"Can't Nominate Current Map"
@@ -90,17 +90,17 @@
 
 	"Current Map"
 	{
-		"en"			"(Current Map)"
+		"en"			"(Current Map)\n "
 	}
 
 	"Recently Played"
 	{
-		"en"			"(Recently Played)"
+		"en"			"(Recently Played)\n "
 	}
 
 	"Nominated"
 	{
-		"en"			"(Nominated)"
+		"en"			"(Nominated)\n "
 	}
 
 	"Map was not found"
