@@ -90,7 +90,6 @@ Handle g_RetryTimer = null;
 /* Data Handles */
 ArrayList g_MapList;
 ArrayList g_MapListTier;
-ArrayList g_MapListWhiteList;
 ArrayList g_NominateList;
 ArrayList g_NominateOwners;
 ArrayList g_OldMapList;
@@ -104,7 +103,6 @@ bool g_WaitingForVote;
 bool g_MapVoteCompleted;
 bool g_ChangeMapAtRoundEnd;
 bool g_ChangeMapInProgress;
-int g_mapFileSerial = -1;
 
 bool g_PointsREQ[MAXPLAYERS+1] = {false, ...};
 bool g_RankREQ[MAXPLAYERS+1] = {false, ...};
@@ -120,9 +118,9 @@ Handle g_hDb = null;
 #define PERCENT 0x25
 
 //SQL Queries
-char sql_SelectMapListSpecific[] = "SELECT ck_zones.mapname, tier, count(ck_zones.mapname), bonus FROM `ck_zones` INNER JOIN ck_maptier on ck_zones.mapname = ck_maptier.mapname LEFT JOIN ( SELECT mapname as map_2, MAX(ck_zones.zonegroup) as bonus FROM ck_zones GROUP BY mapname ) as a on ck_zones.mapname = a.map_2 WHERE (zonegroup = 0 AND zonetype = 1 or zonetype = 3) AND tier = %s GROUP BY mapname, tier, bonus ORDER BY mapname ASC";
-char sql_SelectMapListRange[] = "SELECT ck_zones.mapname, tier, count(ck_zones.mapname), bonus FROM `ck_zones` INNER JOIN ck_maptier on ck_zones.mapname = ck_maptier.mapname LEFT JOIN ( SELECT mapname as map_2, MAX(ck_zones.zonegroup) as bonus FROM ck_zones GROUP BY mapname ) as a on ck_zones.mapname = a.map_2 WHERE (zonegroup = 0 AND zonetype = 1 or zonetype = 3) AND tier >= %s AND tier <= %s GROUP BY mapname, tier, bonus ORDER BY mapname ASC";
-char sql_SelectMapList[] = "SELECT ck_zones.mapname, tier, count(ck_zones.mapname), bonus FROM `ck_zones` INNER JOIN ck_maptier on ck_zones.mapname = ck_maptier.mapname LEFT JOIN ( SELECT mapname as map_2, MAX(ck_zones.zonegroup) as bonus FROM ck_zones GROUP BY mapname ) as a on ck_zones.mapname = a.map_2 WHERE (zonegroup = 0 AND zonetype = 1 or zonetype = 3) GROUP BY mapname, tier, bonus ORDER BY mapname ASC";
+char sql_SelectMapListSpecific[] = "SELECT ck_zones.mapname, tier, count(ck_zones.mapname), bonus FROM `ck_zones` INNER JOIN ck_maptier on ck_zones.mapname = ck_maptier.mapname LEFT JOIN ( SELECT mapname as map_2, MAX(ck_zones.zonegroup) as bonus FROM ck_zones GROUP BY mapname ) as a on ck_zones.mapname = a.map_2 WHERE (zonegroup = 0 AND zonetype = 1 or zonetype = 2 or zonetype = 3) AND tier = %s GROUP BY mapname, tier, bonus ORDER BY mapname ASC";
+char sql_SelectMapListRange[] = "SELECT ck_zones.mapname, tier, count(ck_zones.mapname), bonus FROM `ck_zones` INNER JOIN ck_maptier on ck_zones.mapname = ck_maptier.mapname LEFT JOIN ( SELECT mapname as map_2, MAX(ck_zones.zonegroup) as bonus FROM ck_zones GROUP BY mapname ) as a on ck_zones.mapname = a.map_2 WHERE (zonegroup = 0 AND zonetype = 1 or zonetype = 2 or zonetype = 3) AND tier >= %s AND tier <= %s GROUP BY mapname, tier, bonus ORDER BY mapname ASC";
+char sql_SelectMapList[] = "SELECT ck_zones.mapname, tier, count(ck_zones.mapname), bonus FROM `ck_zones` INNER JOIN ck_maptier on ck_zones.mapname = ck_maptier.mapname LEFT JOIN ( SELECT mapname as map_2, MAX(ck_zones.zonegroup) as bonus FROM ck_zones GROUP BY mapname ) as a on ck_zones.mapname = a.map_2 WHERE (zonegroup = 0 AND zonetype = 1 or zonetype = 2 or zonetype = 3) GROUP BY mapname, tier, bonus ORDER BY mapname ASC";
 char sql_SelectRank[] = "SELECT COUNT(*) FROM ck_playerrank WHERE style = 0 AND points >= (SELECT points FROM ck_playerrank WHERE steamid = '%s' AND style = 0);";
 char sql_SelectPoints[] = "SELECT points FROM ck_playerrank WHERE steamid = '%s' AND style = 0";
 
@@ -142,7 +140,6 @@ public void OnPluginStart()
 	int arraySize = ByteCountToCells(PLATFORM_MAX_PATH);
 	g_MapList = new ArrayList(arraySize);
 	g_MapListTier = new ArrayList(arraySize);
-	g_MapListWhiteList = new ArrayList(arraySize);
 	g_NominateList = new ArrayList(arraySize);
 	g_NominateOwners = new ArrayList();
 	g_OldMapList = new ArrayList(arraySize);
@@ -243,20 +240,6 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnConfigsExecuted()
 {
-	if (ReadMapList(g_MapListWhiteList,
-					 g_mapFileSerial, 
-					 "mapchooser",
-					 MAPLIST_FLAG_CLEARARRAY|MAPLIST_FLAG_MAPSFOLDER)
-		!= INVALID_HANDLE)
-		
-	{
-		if (g_mapFileSerial == -1)
-		{
-			LogError("Unable to create a valid map list.");
-		}
-	}
-
-
 	g_ChatPrefix = FindConVar("ck_chat_prefix");
 	GetConVarString(g_ChatPrefix, g_szChatPrefix, sizeof(g_szChatPrefix));
 
@@ -368,13 +351,14 @@ public Action Command_SetNextmap(int client, int args)
 	char displayName[PLATFORM_MAX_PATH];
 	GetCmdArg(1, map, sizeof(map));
 
-	if (FindMap(map, displayName, sizeof(displayName)) == FindMap_NotFound)
+	int map_index = FindStringInArray(g_MapList, map);
+	if (map_index == -1)
 	{
 		CReplyToCommand(client, "%t", "Map was not found", g_szChatPrefix, map);
 		return Plugin_Handled;
 	}
 
-	GetMapDisplayName(displayName, displayName, sizeof(displayName));
+	GetArrayString(g_MapList, map_index	, displayName, sizeof(displayName));
 
 	CShowActivity2(client, g_szChatPrefix, "%t", "Changed Next Map", displayName);
 	LogAction(client, -1, "\"%L\" changed nextmap to \"%s\"", client, map);
@@ -731,13 +715,15 @@ void InitiateVote(MapChange when, ArrayList inputlist=null)
 		{
 			inputlist.GetString(i, map, sizeof(map));
 			
-			if (IsMapValid(map))
+			char displayName[PLATFORM_MAX_PATH];
+			if (FindStringInArray(g_MapList, map) > -1)
 			{
-				char displayName[PLATFORM_MAX_PATH];
-				// GetMapDisplayName(map, displayName, sizeof(displayName));
 				GetMapDisplayNameTier(map, displayName, sizeof(displayName));
 				g_VoteMenu.AddItem(map, displayName);
-			}	
+			}
+			else {
+				PrintToConsole(0, "+++_ %s | %s not found+++", map, displayName);
+			}
 		}
 	}
 	
@@ -1069,16 +1055,12 @@ bool CanVoteStart()
 
 NominateResult InternalNominateMap(char[] map, bool force, int owner)
 {
-	if (!IsMapValid(map))
-	{
+	if (FindStringInArray(g_MapList, map) == -1)
 		return Nominate_InvalidMap;
-	}
 	
 	/* Map already in the vote */
-	if (g_NominateList.FindString(map) != -1)
-	{
+	if (FindStringInArray(g_NominateList, map) != -1)
 		return Nominate_AlreadyInVote;	
-	}
 	
 	int index;
 
@@ -1098,9 +1080,7 @@ NominateResult InternalNominateMap(char[] map, bool force, int owner)
 	
 	/* Too many nominated maps. */
 	if (g_NominateList.Length >= g_Cvar_IncludeMaps.IntValue && !force)
-	{
 		return Nominate_VoteFull;
-	}
 	
 	g_NominateList.PushString(map);
 	g_NominateOwners.Push(owner);
@@ -1218,6 +1198,8 @@ public int Native_InitiateVote(Handle plugin, int numParams)
 	
 	LogAction(-1, -1, "Starting map vote because outside request");
 	InitiateVote(when, inputarray);
+
+	return 0;
 }
 
 /* native bool CanMapChooserStartVote(); */
@@ -1245,7 +1227,7 @@ public int Native_GetExcludeMapList(Handle plugin, int numParams)
 	
 	if (array == null)
 	{
-		return;	
+		return 0;	
 	}
 	int size = g_OldMapList.Length;
 	char map[PLATFORM_MAX_PATH];
@@ -1256,7 +1238,7 @@ public int Native_GetExcludeMapList(Handle plugin, int numParams)
 		array.PushString(map);	
 	}
 	
-	return;
+	return 0;
 }
 
 /* native void GetNominatedMapList(ArrayList maparray, ArrayList ownerarray = null); */
@@ -1266,7 +1248,7 @@ public int Native_GetNominatedMapList(Handle plugin, int numParams)
 	ArrayList ownerarray = view_as<ArrayList>(GetNativeCell(2));
 	
 	if (maparray == null)
-		return;
+		return 0;
 
 	char map[PLATFORM_MAX_PATH];
 
@@ -1283,7 +1265,7 @@ public int Native_GetNominatedMapList(Handle plugin, int numParams)
 		}
 	}
 
-	return;
+	return 0;
 }
 
 public void db_setupDatabase()
@@ -1364,13 +1346,13 @@ public void SelectMapListCallback(Handle owner, Handle hndl, const char[] error,
 			
 			Format(szValue, sizeof(szValue), "%t", "Final Map Info", szMapName, sztier, stages, bonuses);
 
-			if (IsMapValid(szMapName) && FindStringInArray(g_MapListWhiteList, szMapName) > -1)
+			if (IsMapValid(szMapName))
 			{
 				g_MapList.PushString(szMapName);
 				g_MapListTier.PushString(szValue);
 			}
-			// else
-				// LogError("Error 404: Map %s was found in database but not on server! Please delete entry in database or add the map to server!", szMapName);
+			else
+				LogError("[st-mapchooser] Error 404: Map %s was found in database but not on server! Please delete entry in database or add the map to server!", szMapName);
 		}
 	}
 	CreateNextVote();
@@ -1395,7 +1377,7 @@ public void GetMapDisplayNameTier(char[] szMapName, char szBuffer[PLATFORM_MAX_P
 		Format(szBuffer, sizeof(szBuffer), "Invalid Map");
 }
 
-public bool DisplayVoteToPros(int time, int flags, Menu menu) 
+public void DisplayVoteToPros(int time, int flags, Menu menu) 
 {
 	g_PlayerOne = FindConVar("sm_rtv_oneplayer");
 	int total = 0;

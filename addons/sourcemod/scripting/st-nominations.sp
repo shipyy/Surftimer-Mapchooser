@@ -66,8 +66,6 @@ Menu g_MapMenu = null;
 
 ArrayList g_MapList = null;
 ArrayList g_MapListTier = null;
-ArrayList g_MapListWhiteList = null;
-int g_mapFileSerial = -1;
 
 // Tiered menu
 ConVar g_Cvar_Tiered_Menu;
@@ -103,7 +101,6 @@ public void OnPluginStart()
 	int arraySize = ByteCountToCells(PLATFORM_MAX_PATH);
 	g_MapList = CreateArray(arraySize);
 	g_MapListTier = new ArrayList(arraySize);
-	g_MapListWhiteList = new ArrayList(arraySize);
 	g_MapTierInt = new ArrayList();
 	g_aTierMenus = new ArrayList(arraySize);
 
@@ -154,18 +151,6 @@ public void OnConfigsExecuted()
 		g_TierMax = g_TierMin;
 		g_TierMin = temp;
 	}
-
-	if (ReadMapList(g_MapListWhiteList,
-					g_mapFileSerial,
-					"nominations",
-					MAPLIST_FLAG_CLEARARRAY|MAPLIST_FLAG_MAPSFOLDER)
-		== INVALID_HANDLE)
-	{
-		if (g_mapFileSerial == -1)
-		{
-			SetFailState("Unable to create a valid map list.");
-		}
-	}
 	
 	SelectMapList();
 }
@@ -175,7 +160,11 @@ public void OnNominationRemoved(const char[] map, int owner)
 	int status;
 	
 	char resolvedMap[PLATFORM_MAX_PATH];
-	FindMap(map, resolvedMap, sizeof(resolvedMap));
+
+	int map_index = FindStringInArray(g_MapList, map);
+	if (map_index == -1)
+		return;
+	GetArrayString(g_MapList, map_index, resolvedMap, sizeof(resolvedMap));
 	
 	/* Is the map in our list? */
 	if (!g_mapTrie.GetValue(resolvedMap, status))
@@ -201,29 +190,29 @@ public Action Command_Addmap(int client, int args)
 	}
 	
 	char mapname[PLATFORM_MAX_PATH];
-	char resolvedMap[PLATFORM_MAX_PATH];
 	GetCmdArg(1, mapname, sizeof(mapname));
 
-	if (FindMap(mapname, resolvedMap, sizeof(resolvedMap)) == FindMap_NotFound)
+	int map_index = FindStringInArray(g_MapList, mapname);
+	if (map_index == -1)
 	{
-		// We couldn't resolve the map entry to a filename, so...
+		// MAPNAME NOT FOUND IN DATABASE
 		CReplyToCommand(client, "%t", "Map was not found", g_szChatPrefix, mapname);
 		return Plugin_Handled;		
 	}
 	
 	char displayName[PLATFORM_MAX_PATH];
-	GetMapDisplayName(resolvedMap, displayName, sizeof(displayName));
+	GetArrayString(g_MapList, map_index, displayName, sizeof(displayName));
 	
 	int status;
-	if (!g_mapTrie.GetValue(resolvedMap, status))
+	if (!g_mapTrie.GetValue(displayName, status))
 	{
 		CReplyToCommand(client, "%t", "Map was not found", g_szChatPrefix, displayName);
 		return Plugin_Handled;		
 	}
 
-	RemoveMapPath(resolvedMap, resolvedMap, sizeof(resolvedMap));
+	RemoveMapPath(displayName, displayName, sizeof(displayName));
 
-	NominateResult result = NominateMap(resolvedMap, false, client);
+	NominateResult result = NominateMap(displayName, false, client);
 	
 	if (result > Nominate_Replaced)
 	{
@@ -234,7 +223,7 @@ public Action Command_Addmap(int client, int args)
 	}
 	
 	
-	g_mapTrie.SetValue(resolvedMap, MAPSTATUS_DISABLED|MAPSTATUS_EXCLUDE_NOMINATED);
+	g_mapTrie.SetValue(displayName, MAPSTATUS_DISABLED|MAPSTATUS_EXCLUDE_NOMINATED);
 
 	
 	CReplyToCommand(client, "%t", "Map Inserted", g_szChatPrefix, displayName);
@@ -283,7 +272,10 @@ public Action Command_Nominate(int client, int args)
 	char mapname[PLATFORM_MAX_PATH];
 	GetCmdArg(1, mapname, sizeof(mapname));
 	
-	if (FindMap(mapname, mapname, sizeof(mapname)) == FindMap_NotFound)
+	FindMap(mapname, mapname, sizeof mapname);
+
+	int map_index = FindStringInArray(g_MapList, mapname);
+	if (map_index == -1)
 	{
 		// We couldn't resolve the map entry to a filename, so...
 		CReplyToCommand(client, "%t", "Map was not found", g_szChatPrefix, mapname);
@@ -291,7 +283,7 @@ public Action Command_Nominate(int client, int args)
 	}
 	
 	char displayName[PLATFORM_MAX_PATH];
-	GetMapDisplayName(mapname, displayName, sizeof(displayName));
+	GetArrayString(g_MapList, map_index, displayName, sizeof(displayName));
 	
 	int status;
 	if (!g_mapTrie.GetValue(mapname, status))
@@ -418,6 +410,8 @@ public int IncompleteNominate_SelectStyleHandler(Menu menu, MenuAction action, i
 	{
 		delete menu;
 	}
+
+	return 0;
 }
 
 void AttemptIncompleteNominate(int client, int style)
@@ -453,7 +447,7 @@ void SQL_SelectIncompleteMapListCallback(Handle owner, Handle hndl, const char[]
 			// resultMapTier = SQL_FetchInt(hndl, 1);
 
 			any trieStatus;
-			if (g_MapList.FindString(resultMap) > -1 && IsMapValid(resultMap) && g_mapTrie.GetValue(resultMap, trieStatus))
+			if (g_MapList.FindString(resultMap) > -1 && g_mapTrie.GetValue(resultMap, trieStatus))
 			{
 				int status = MAPSTATUS_ENABLED;
 				g_MapList.GetString(g_MapList.FindString(resultMap), resolvedMap, sizeof(resolvedMap));
@@ -526,14 +520,6 @@ void BuildMapMenu()
 		
 		g_MapList.GetString(i, map, sizeof(map));
 
-		Format(map, sizeof(map), "%s.", map);
-		
-		FindMap(map, map, sizeof(map));
-		
-		char displayName[PLATFORM_MAX_PATH];
-		GetArrayString(g_MapListTier, i, displayName, sizeof(displayName));
-		// GetMapDisplayName(map, displayName, sizeof(displayName));
-
 		if (g_Cvar_ExcludeCurrent.BoolValue)
 		{
 			if (StrEqual(map, currentMap))
@@ -551,7 +537,7 @@ void BuildMapMenu()
 			}
 		}
 
-		g_MapMenu.AddItem(map, displayName);
+		g_MapMenu.AddItem(map, map);
 		g_mapTrie.SetValue(map, status);
 	}
 
@@ -758,14 +744,14 @@ public void SelectMapListCallback(Handle owner, Handle hndl, const char[] error,
 			
 			Format(szValue, sizeof(szValue), "%t", "Final Map Info", szMapName, sztier, stages, bonuses);
 
-			if (IsMapValid(szMapName) && FindStringInArray(g_MapListWhiteList, szMapName) > -1)
+			if (IsMapValid(szMapName))
 			{
 				g_MapList.PushString(szMapName);
 				g_MapListTier.PushString(szValue);
 				g_MapTierInt.Push(tier);
 			}
-			// else
-				// LogError("Error 404: Map %s was found in database but not on server! Please delete entry in database or add the map to server!", szMapName);
+			else
+				LogError("[st-nominations] Error 404: Map %s was found in database but not on server! Please delete entry in database or add the map to server!", szMapName);
 		}
 
 		BuildMapMenu();
@@ -796,9 +782,6 @@ void BuildTierMenus()
 	{
 		GetArrayString(g_MapList, i, map, sizeof(map));
 		int tier = g_MapTierInt.Get(i);
-
-		Format(map, sizeof(map), "%s.", map);
-		FindMap(map, map, sizeof(map));
 		
 		char displayName[PLATFORM_MAX_PATH];
 		GetArrayString(g_MapListTier, i, displayName, sizeof(displayName));
@@ -809,7 +792,6 @@ void BuildTierMenus()
 		}
 	}
 
-	// BuildTieredMenu
 	delete g_TieredMenu;
 
 	g_TieredMenu = new Menu(TiersMenuHandler);
@@ -857,6 +839,8 @@ public int TiersMenuHandler(Menu menu, MenuAction action, int client, int param2
 			DisplayMenu(g_aTierMenus.Get(StringToInt(option)-g_TierMin), client, MENU_TIME_FOREVER);
 		}
 	}
+
+	return 0;
 }
 
 public void RemoveMapPath(const char[] map, char[] destination, any maxlen)
