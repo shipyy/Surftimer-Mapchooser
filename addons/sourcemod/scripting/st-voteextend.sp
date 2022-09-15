@@ -87,6 +87,8 @@ public void OnConfigsExecuted()
 public Action Timer_Delay(Handle timer)
 {
 	g_bVEAllowed = true;
+
+	return Plugin_Handled;
 }
 
 public Action Command_VoteExtend(int client, int args)
@@ -206,6 +208,8 @@ public int H_VoteExtend(Menu tMenu, MenuAction action, int client, int item)
 	{
 		CloseHandle(tMenu);
 	}
+
+	return 0;
 }
 
 stock bool IsValidClient(int client) 
