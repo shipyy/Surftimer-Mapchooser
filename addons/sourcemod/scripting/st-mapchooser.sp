@@ -1218,6 +1218,8 @@ public int Native_InitiateVote(Handle plugin, int numParams)
 	
 	LogAction(-1, -1, "Starting map vote because outside request");
 	InitiateVote(when, inputarray);
+
+	return 0;
 }
 
 /* native bool CanMapChooserStartVote(); */
@@ -1233,19 +1235,19 @@ public int Native_CheckVoteDone(Handle plugin, int numParams)
 }
 
 /* native bool EndOfMapVoteEnabled(); */
-public int Native_EndOfMapVoteEnabled(Handle plugin, int numParams)
+public any Native_EndOfMapVoteEnabled(Handle plugin, int numParams)
 {
 	return g_Cvar_EndOfMapVote.BoolValue;
 }
 
 /* native void GetExcludeMapList(ArrayList array); */
-public int Native_GetExcludeMapList(Handle plugin, int numParams)
+public any Native_GetExcludeMapList(Handle plugin, int numParams)
 {
 	ArrayList array = view_as<ArrayList>(GetNativeCell(1));
 	
 	if (array == null)
 	{
-		return;	
+		return array;	
 	}
 	int size = g_OldMapList.Length;
 	char map[PLATFORM_MAX_PATH];
@@ -1256,17 +1258,17 @@ public int Native_GetExcludeMapList(Handle plugin, int numParams)
 		array.PushString(map);	
 	}
 	
-	return;
+	return array;
 }
 
 /* native void GetNominatedMapList(ArrayList maparray, ArrayList ownerarray = null); */
-public int Native_GetNominatedMapList(Handle plugin, int numParams)
+public any Native_GetNominatedMapList(Handle plugin, int numParams)
 {
 	ArrayList maparray = view_as<ArrayList>(GetNativeCell(1));
 	ArrayList ownerarray = view_as<ArrayList>(GetNativeCell(2));
 	
 	if (maparray == null)
-		return;
+		return maparray;
 
 	char map[PLATFORM_MAX_PATH];
 
@@ -1283,7 +1285,7 @@ public int Native_GetNominatedMapList(Handle plugin, int numParams)
 		}
 	}
 
-	return;
+	return maparray;
 }
 
 public void db_setupDatabase()
@@ -1396,7 +1398,7 @@ public void GetMapDisplayNameTier(char[] szMapName, char szBuffer[PLATFORM_MAX_P
 		Format(szBuffer, sizeof(szBuffer), "Invalid Map");
 }
 
-public bool DisplayVoteToPros(int time, int flags, Menu menu) 
+public void DisplayVoteToPros(int time, int flags, Menu menu) 
 {
 	g_PlayerOne = FindConVar("sm_rtv_oneplayer");
 	int total = 0;
