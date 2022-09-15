@@ -96,7 +96,7 @@ public Action Command_VoteExtend(int client, int args)
 	if(!IsValidClient(client))
 		return Plugin_Handled;
 
-	if(g_VipFeature)
+	if(g_VipFeature.BoolValue)
 	{
 		if(!surftimer_IsClientVip(client))
 		{
