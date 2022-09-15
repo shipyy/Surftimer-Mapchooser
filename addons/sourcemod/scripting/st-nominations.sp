@@ -528,7 +528,7 @@ void BuildMapMenu()
 		
 		if (FindStringInArray(g_MapListWhiteList, map) == -1)
 		{
-			LogError("Error 404: Map %s was found in database but not on mapcycle! Please delete entry in database or add the map to server mapcycle!", map);
+			LogError("Error 404: Map %s was not found in the mapcycle!", map);
 			continue;
 		}
 		
@@ -761,8 +761,6 @@ public void SelectMapListCallback(Handle owner, Handle hndl, const char[] error,
 			Format(szValue, sizeof(szValue), "%t", "Final Map Info", szMapName, sztier, stages, bonuses);
 
 			char resolvedMap[PLATFORM_MAX_PATH];
-
-			//if (IsMapValid(szMapName) && FindStringInArray(g_MapListWhiteList, szMapName) > -1)
 			if ((FindMap(szMapName, resolvedMap, sizeof(resolvedMap)) == FindMap_Found) && FindStringInArray(g_MapListWhiteList, szMapName) > -1)
 			{
 				g_MapList.PushString(szMapName);
@@ -804,7 +802,7 @@ void BuildTierMenus()
 
 		if (FindStringInArray(g_MapListWhiteList, map) == -1)
 		{
-			LogError("Error 404: Map %s was found in database but not on mapcycle! Please delete entry in database or add the map to server mapcycle!", map);
+			LogError("Error 404: Map %s was not found in the mapcycle!", map);
 			continue;
 		}
 		

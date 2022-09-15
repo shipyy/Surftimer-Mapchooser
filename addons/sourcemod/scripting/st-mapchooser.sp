@@ -1365,8 +1365,7 @@ public void SelectMapListCallback(Handle owner, Handle hndl, const char[] error,
 			Format(szValue, sizeof(szValue), "%t", "Final Map Info", szMapName, sztier, stages, bonuses);
 
 			char resolvedMap[PLATFORM_MAX_PATH];
-			//if (IsMapValid(szMapName) && FindStringInArray(g_MapListWhiteList, szMapName) > -1)
-			if (FindStringInArray(g_MapListWhiteList, szMapName) > -1)
+			if ((FindMap(szMapName, resolvedMap, sizeof(resolvedMap)) == FindMap_Found) && FindStringInArray(g_MapListWhiteList, szMapName) > -1)
 			{
 				g_MapList.PushString(szMapName);
 				g_MapListTier.PushString(szValue);
