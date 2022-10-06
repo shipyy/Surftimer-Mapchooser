@@ -286,6 +286,10 @@ void AttemptRTV(int client)
 	}
 
 	if (iPlayers > 0 && iPlayers < g_Cvar_MinPlayers.IntValue)
+	{
+		CReplyToCommand(client, "%t", "Minimal Players Not Met", g_szChatPrefix);
+		return;			
+	}
 	
 	if (g_Voted[client])
 	{
