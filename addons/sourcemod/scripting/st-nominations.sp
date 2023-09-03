@@ -769,8 +769,8 @@ public void SelectMapListCallback(Handle owner, Handle hndl, const char[] error,
 				g_MapListTier.PushString(szValue);
 				g_MapTierInt.Push(tier);
 			}
-			else
-				LogError("Error 404: Map %s was found in database but not on mapcycle/maps folder! Please delete entry in database or add the map to server mapcycle/maps folder!", szMapName);
+			//else
+			//	LogError("Error 404: Map %s was found in database but not on mapcycle/maps folder! Please delete entry in database or add the map to server mapcycle/maps folder!", szMapName);
 		}
 
 		BuildMapMenu();

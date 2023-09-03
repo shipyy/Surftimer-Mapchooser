@@ -5,25 +5,25 @@
 		"#format"		"{1:s}"
 		"en"			"{1} {red}Rock the Vote is not allowed yet."
 	}
-	
+
 	"RTV Started"
 	{
 		"#format"		"{1:s}"
 		"en"			"{1} {yellow}Rock the Vote has already started."
 	}
-	
+
 	"Already Voted"
 	{
  		"#format"		"{1:s},{2:d},{3:d}"
 	 	"en"			"{1} {yellow}You have already voted to Rock the Vote. ({2} votes, {3} required)"
 	}
-	
+
 	"Minimal Players Not Met"
 	{
 		"#format"		"{1:s}"
 		"en"			"{1} {yellow}The minimal number of players required has not been met."
 	}
-	
+
 	"RTV Requested"
 	{
 		"#format"		"{1:s},{2:s},{3:d},{4:d}"
@@ -46,5 +46,11 @@
 	{
 		"#format"		"{1:s}"
 		"en"			"{1} {red}You do not meet the point requirement!"
+	}
+
+	"Join Time Requirement"
+	{
+		"#format"		"{1:s},{2:s}"
+		"en"			"{1} {red}You must wait {blue}{2} minutes {red}after joining the server before being allowed to use /rtv!"
 	}
 }

@@ -33,6 +33,7 @@
  
 #pragma semicolon 1
 #include <sourcemod>
+#include <sdktools>
 #include <mapchooser>
 #include <nextmap>
 #include <surftimer>
@@ -816,6 +817,7 @@ public void Handler_VoteFinishedGeneric(Menu menu, int num_votes, int num_client
 
 		CPrintToChatAll("%t", "Current Map Extended", g_szChatPrefix, RoundToFloor(float(item_info[0][VOTEINFO_ITEM_VOTES])/float(num_votes)*100), num_votes);
 		LogAction(-1, -1, "Voting for next map has finished. The current map has been extended.");
+		GameRules_SetProp("m_iRoundTime", GameRules_GetProp("m_iRoundTime", 4, 0) + RoundToFloor(10.0*60), 4, 0, true);
 		
 		// We extended, so we'll have to vote again.
 		g_HasVoteStarted = false;
@@ -1372,8 +1374,8 @@ public void SelectMapListCallback(Handle owner, Handle hndl, const char[] error,
 				g_MapList.PushString(szMapName);
 				g_MapListTier.PushString(szValue);
 			}
-			else
-				LogError("Error 404: Map %s was found in database but not on mapcycle/maps folder! Please delete entry in database or add the map to server mapcycle/maps folder!", szMapName);
+			//else
+			//	LogError("Error 404: Map %s was found in database but not on mapcycle/maps folder! Please delete entry in database or add the map to server mapcycle/maps folder!", szMapName);
 		}
 	}
 	CreateNextVote();

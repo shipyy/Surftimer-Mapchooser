@@ -9,7 +9,7 @@
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License, version 3.0, as published by the
  * Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
@@ -56,6 +56,7 @@ ConVar g_Cvar_Interval;
 ConVar g_Cvar_ChangeTime;
 ConVar g_Cvar_RTVPostVoteAction;
 ConVar g_Cvar_PointsRequirement;
+ConVar g_Cvar_JoinTimeRequirement;
 ConVar g_Cvar_RankRequirement;
 ConVar g_Cvar_VIPOverwriteRequirements;
 ConVar g_PlayerOne;
@@ -74,6 +75,8 @@ bool g_Voted[MAXPLAYERS+1] = {false, ...};
 bool g_PointsREQ[MAXPLAYERS+1] = {false, ...};
 bool g_RankREQ[MAXPLAYERS+1] = {false, ...};
 
+int g_iTimestampAllowedtoVote[MAXPLAYERS+1];
+
 bool g_InChange = false;
 
 Handle g_hDb = null;
@@ -88,7 +91,7 @@ public void OnPluginStart()
 	AutoExecConfig_SetCreateDirectory(true);
 	AutoExecConfig_SetCreateFile(true);
 	AutoExecConfig_SetFile("st-rtv");
-	
+
 	g_Cvar_Needed = AutoExecConfig_CreateConVar("sm_rtv_needed", "0.60", "Percentage of players needed to rockthevote (Def 60%)", 0, true, 0.05, true, 1.0);
 	g_Cvar_MinPlayers = AutoExecConfig_CreateConVar("sm_rtv_minplayers", "0", "Number of players required before RTV will be enabled.", 0, true, 0.0, true, float(MAXPLAYERS));
 	g_Cvar_InitialDelay = AutoExecConfig_CreateConVar("sm_rtv_initialdelay", "30.0", "Time (in seconds) before first RTV can be held", 0, true, 0.00);
@@ -96,13 +99,14 @@ public void OnPluginStart()
 	g_Cvar_ChangeTime = AutoExecConfig_CreateConVar("sm_rtv_changetime", "0", "When to change the map after a succesful RTV: 0 - Instant, 1 - RoundEnd, 2 - MapEnd", _, true, 0.0, true, 2.0);
 	g_Cvar_RTVPostVoteAction = AutoExecConfig_CreateConVar("sm_rtv_postvoteaction", "0", "What to do with RTV's after a mapvote has completed. 0 - Allow, success = instant change, 1 - Deny", _, true, 0.0, true, 1.0);
 	g_Cvar_PointsRequirement = AutoExecConfig_CreateConVar("sm_rtv_point_requirement", "0", "Amount of points required to use the rtv command, 0 to disable");
+	g_Cvar_JoinTimeRequirement = AutoExecConfig_CreateConVar("sm_rtv_joint_time_requirement", "0", "0 - Disables required waiting time for using rtv");
 	g_Cvar_RankRequirement = AutoExecConfig_CreateConVar("sm_rtv_rank_requirement", "0", "Rank required to use the rtv command, 0 to disable");
 	g_Cvar_VIPOverwriteRequirements = AutoExecConfig_CreateConVar("sm_rtv_vipoverwrite", "0", "1 - VIP's bypass Rank and/or Points requirement, 0 - VIP's need to meet the Rank and/or Points requirement", _, true, 0.0, true, 1.0);
 	g_PlayerOne = AutoExecConfig_CreateConVar("sm_rtv_oneplayer", "1", "If there is  only one player in the server allow him to rtv 1-allow 0-no", _, true, 0.0, true, 1.0);
 	g_Cvar_ExcludeSpectators = AutoExecConfig_CreateConVar("sm_rtv_exclude_spectators", "1", "Exclude spectators (incl. SourceTV/GOTV) from players count?", _, true, 0.0, true, 1.0);
 
 	RegConsoleCmd("sm_rtv", Command_RTV);
-	
+
 	AutoExecConfig_ExecuteFile();
 	AutoExecConfig_CleanFile();
 
@@ -113,8 +117,8 @@ public void OnPluginStart()
 	{
 		if (IsClientConnected(i))
 		{
-			OnClientPostAdminCheck(i);	
-		}	
+			OnClientPostAdminCheck(i);
+		}
 	}
 }
 
@@ -125,7 +129,7 @@ public void db_setupDatabase()
 
 	if (g_hDb == null)
 		SetFailState("[RTV] Unable to connect to database (%s)", szError);
-	
+
 	char szIdent[8];
 	SQL_ReadDriver(g_hDb, szIdent, 8);
 
@@ -154,7 +158,7 @@ public void OnConfigsExecuted()
 {
 	g_ChatPrefix = FindConVar("ck_chat_prefix");
 	GetConVarString(g_ChatPrefix, g_szChatPrefix, sizeof(g_szChatPrefix));
-	
+
 	CreateTimer(g_Cvar_InitialDelay.FloatValue, Timer_DelayRTV, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
@@ -168,8 +172,8 @@ public void OnClientPostAdminCheck(int client)
 	GetPlayerRank(client);
 	GetPlayerPoints(client);
 
-	g_Voters++;
-	CalcVotesNeeded();
+	//GET TIMESTAMP TO CHECK WETHER OR NOT PLAYER CAN RTV AFTER JOINING SERVER
+	g_iTimestampAllowedtoVote[client] = GetTime() + ( GetConVarInt(g_Cvar_JoinTimeRequirement) * 60 );
 }
 
 public void CalcVotesNeeded()
@@ -185,13 +189,15 @@ public void CalcVotesNeeded()
 			}
 		}
 		g_VotesNeeded = RoundToCeil(float(RealVoters) * g_Cvar_Needed.FloatValue);
+		LogError("new calculation ( with ranks ) : %d | %f | %d | %d", g_VotesNeeded, g_Cvar_Needed.FloatValue, GetConVarInt(g_Cvar_RankRequirement), GetConVarInt(g_Cvar_PointsRequirement));
 	}
 	else
 	{
 		g_VotesNeeded = RoundToCeil(float(g_Voters) * g_Cvar_Needed.FloatValue);
+		LogError("new calculation ( without ranks ) : %d | %f", g_VotesNeeded, g_Cvar_Needed.FloatValue);
+
 	}
 }
-	
 
 public void OnClientDisconnect(int client)
 {
@@ -200,30 +206,27 @@ public void OnClientDisconnect(int client)
 		g_Voted[client] = false;
 		g_Votes--;
     }
-	
+
 	if (IsFakeClient(client))
 	{
 		return;
 	}
-	
+
 	g_RankREQ[client] = false;
 	g_PointsREQ[client] = false;
 
 	g_Voters--;
 	CalcVotesNeeded();
-	
-	if (g_Votes && 
-		g_Voters && 
-		g_Votes >= g_VotesNeeded && 
-		g_RTVAllowed ) 
+
+	if ( g_Votes && g_Voters && g_Votes >= g_VotesNeeded && g_RTVAllowed )
 	{
 		if (g_Cvar_RTVPostVoteAction.IntValue == 1 && HasEndOfMapVoteFinished())
 		{
 			return;
 		}
-		
+
 		StartRTV();
-	}	
+	}
 }
 
 public void OnClientSayCommand_Post(int client, const char[] command, const char[] sArgs)
@@ -232,13 +235,13 @@ public void OnClientSayCommand_Post(int client, const char[] command, const char
 	{
 		return;
 	}
-	
+
 	if (strcmp(sArgs, "rtv", false) == 0 || strcmp(sArgs, "rockthevote", false) == 0)
 	{
 		ReplySource old = SetCmdReplySource(SM_REPLY_TO_CHAT);
-		
+
 		AttemptRTV(client);
-		
+
 		SetCmdReplySource(old);
 	}
 }
@@ -249,9 +252,9 @@ public Action Command_RTV(int client, int args)
 	{
 		return Plugin_Handled;
 	}
-	
+
 	AttemptRTV(client);
-	
+
 	return Plugin_Handled;
 }
 
@@ -261,19 +264,19 @@ void AttemptRTV(int client)
 	{
 		return;
 	}
-	
+
 	if (!g_RTVAllowed || (g_Cvar_RTVPostVoteAction.IntValue == 1 && HasEndOfMapVoteFinished()))
 	{
 		CReplyToCommand(client, "%t", "RTV Not Allowed", g_szChatPrefix);
 		return;
 	}
-		
+
 	if (!CanMapChooserStartVote())
 	{
 		CReplyToCommand(client, "%t", "RTV Started", g_szChatPrefix);
 		return;
 	}
-	
+
 	int iPlayers = 0;
 
 	if (g_Cvar_ExcludeSpectators.BoolValue)
@@ -288,9 +291,9 @@ void AttemptRTV(int client)
 	if (iPlayers > 0 && iPlayers < g_Cvar_MinPlayers.IntValue)
 	{
 		CReplyToCommand(client, "%t", "Minimal Players Not Met", g_szChatPrefix);
-		return;			
+		return;
 	}
-	
+
 	if (g_Voted[client])
 	{
 		CReplyToCommand(client, "%t", "Already Voted", g_szChatPrefix, g_Votes, g_VotesNeeded);
@@ -299,12 +302,20 @@ void AttemptRTV(int client)
 
 	if (GetConVarInt(g_Cvar_PointsRequirement) > 0 && !g_PointsREQ[client])
 	{
-		CPrintToChat(client, "%t", "Point Requirement", g_szChatPrefix);
+		CPrintToChat(client, "%t", "Point Requirement", g_szChatPrefix, GetConVarInt(g_Cvar_PointsRequirement));
 		return;
 	}
+
 	if (GetConVarInt(g_Cvar_RankRequirement) > 0 && !g_RankREQ[client])
 	{
 		CPrintToChat(client, "%t", "Rank Requirement", g_szChatPrefix, GetConVarInt(g_Cvar_RankRequirement));
+		return;
+	}
+
+	if ( g_iTimestampAllowedtoVote[client] > GetTime() ) {
+		char szTimeFormatted[32];
+		FormatTimeFloat(client, (g_iTimestampAllowedtoVote[client] - GetTime()) * 1.0, szTimeFormatted, sizeof(szTimeFormatted), false);
+		CPrintToChat(client, "%t", "Join Time Requirement", g_szChatPrefix, szTimeFormatted);
 		return;
 	}
 
@@ -319,7 +330,7 @@ void AttemptRTV(int client)
 	if (g_Votes >= g_VotesNeeded)
 	{
 		StartRTV();
-	}	
+	}
 }
 
 int GetRealClientCount()
@@ -348,9 +359,9 @@ void StartRTV()
 {
 	if (g_InChange)
 	{
-		return;	
+		return;
 	}
-	
+
 	if (EndOfMapVoteEnabled() && HasEndOfMapVoteFinished())
 	{
 		/* Change right now then */
@@ -358,25 +369,25 @@ void StartRTV()
 		if (GetNextMap(map, sizeof(map)))
 		{
 			GetMapDisplayName(map, map, sizeof(map));
-			
+
 			CPrintToChatAll("%t", "Changing Maps", g_szChatPrefix, map);
 			CreateTimer(5.0, Timer_ChangeMap, _, TIMER_FLAG_NO_MAPCHANGE);
 			g_InChange = true;
-			
+
 			ResetRTV();
-			
+
 			g_RTVAllowed = false;
 		}
 		return;	
 	}
-	
+
 	if (CanMapChooserStartVote())
 	{
 		MapChange when = view_as<MapChange>(g_Cvar_ChangeTime.IntValue);
 		InitiateMapChooserVote(when);
-		
+
 		ResetRTV();
-		
+
 		g_RTVAllowed = false;
 		CreateTimer(g_Cvar_Interval.FloatValue, Timer_DelayRTV, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
@@ -385,7 +396,7 @@ void StartRTV()
 void ResetRTV()
 {
 	g_Votes = 0;
-			
+
 	for (int i=1; i<=MAXPLAYERS; i++)
 	{
 		g_Voted[i] = false;
@@ -395,15 +406,15 @@ void ResetRTV()
 public Action Timer_ChangeMap(Handle hTimer)
 {
 	g_InChange = false;
-	
+
 	LogMessage("RTV changing map manually");
-	
+
 	char map[PLATFORM_MAX_PATH];
 	if (GetNextMap(map, sizeof(map)))
-	{	
+	{
 		ForceChangeLevel(map, "RTV after mapvote");
 	}
-	
+
 	return Plugin_Stop;
 }
 
@@ -540,4 +551,86 @@ void GetPlayerPointsCallBack(Handle owner, Handle hndl, const char[] error, any 
 		}
 
 	}
+
+	if ( IsClientConnected(client) ) {
+		g_Voters++;
+		CalcVotesNeeded();
+	}
+}
+
+public void FormatTimeFloat(int client, float time, char[] string, int length, bool runtime)
+{
+	char szDays[16];
+	char szHours[16];
+	char szMinutes[16];
+	char szSeconds[16];
+	char szMS[16];
+
+	int time_rounded = RoundToZero(time);
+
+	int days = time_rounded / 86400;
+	int hours = (time_rounded - (days * 86400)) / 3600;
+	int minutes = (time_rounded - (days * 86400) - (hours * 3600)) / 60;
+	int seconds = (time_rounded - (days * 86400) - (hours * 3600) - (minutes * 60));
+	int ms = RoundToZero(FloatFraction(time) * 1000);
+
+	// 00:00:00:00:000
+	// 00:00:00:000
+	// 00:00:000
+
+	//MILISECONDS
+	if (ms < 10)
+		Format(szMS, 16, "00%d", ms);
+	else
+		if (ms < 100)
+			Format(szMS, 16, "0%d", ms);
+		else
+			Format(szMS, 16, "%d", ms);
+
+	//SECONDS
+	if (seconds < 10)
+		Format(szSeconds, 16, "0%d", seconds);
+	else
+		Format(szSeconds, 16, "%d", seconds);
+
+	//MINUTES
+	if (minutes < 10)
+		Format(szMinutes, 16, "0%d", minutes);
+	else
+		Format(szMinutes, 16, "%d", minutes);
+
+	//HOURS
+	if (hours < 10)
+		Format(szHours, 16, "0%d", hours);
+	else
+		Format(szHours, 16, "%d", hours);
+
+	//DAYS
+	if (days < 10)
+		Format(szDays, 16, "0%d", days);
+	else
+		Format(szDays, 16, "%d", days);
+
+	if (!runtime) {
+		if (days > 0) {
+			Format(string, length, "%sd %sh %sm %ss %sms", szDays, szHours, szMinutes, szSeconds, szMS);
+		}
+		else {
+			if (hours > 0) {
+				Format(string, length, "%sh %sm %ss %sms", szHours, szMinutes, szSeconds, szMS);
+			}
+			else {
+				Format(string, length, "%sm %ss %sms", szMinutes, szSeconds, szMS);
+			}
+		}
+	}
+	else {
+		if (hours > 0) {
+			Format(string, length, "%s:%s:%s.%s", szHours, szMinutes, szSeconds, szMS);
+		}
+		else {
+			Format(string, length, "%s:%s.%s", szMinutes, szSeconds, szMS);
+		}
+	}
+
 }
